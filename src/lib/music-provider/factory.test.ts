@@ -47,17 +47,18 @@ const bilibiliTrack: MusicTrack = {
 };
 
 describe("MusicProviderFactory", () => {
-  it("creates a safe placeholder provider for Kugou tracks", async () => {
+  it("creates a PlatformProvider for Kugou tracks", async () => {
     const provider = MusicProviderFactory.getProvider("kugou");
+    expect(provider.source).toBe("kugou");
 
-    await expect(provider.search("测试", 1, 20)).resolves.toEqual({
-      items: [],
-      hasMore: false,
-    });
+    // kugou 现在走 PlatformProvider，getUrl 遍历内置源
+    // 在没有网络的情况下，内置源全部失败 → 返回 null
     await expect(provider.getUrl(kugouTrack)).resolves.toBeNull();
+    // pic 回退到 track.pic_id
     await expect(provider.getPic(kugouTrack)).resolves.toBe(
       "https://example.com/cover.jpg"
     );
+    // lyric 当前没有实现 → null
     await expect(provider.getLyric(kugouTrack)).resolves.toBeNull();
   });
 

@@ -9,4 +9,5 @@ export enum storeKey {
   AppStore = "oh_app_store",
   NeteaseStore = "oh_netease_store",
   OfflineStore = "oh_offline_store",
+  SourceConfigStore = "oh_source_config_store",
 }

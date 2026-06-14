@@ -1,11 +1,13 @@
 import { toast } from "react-hot-toast";
 import { useMusicStore } from "@/store/music-store";
+import { useSourceConfigStore } from "@/store/source-config-store";
 import {
   EXCLUDED_FOR_SEARCH,
   getAggregatedSourcesForMatch,
 } from "@/hooks/use-aggregated-sources";
 import { musicApi } from "@/lib/music-api";
-import { sourceLabels, type MusicTrack } from "@/types/music";
+import { sourceLabels, type MusicTrack, type MusicSource } from "@/types/music";
+import type { MusicPlatform } from "@otter-music/shared";
 import {
   isNameMatch,
   isArtistMatch,
@@ -55,7 +57,21 @@ function scoreAutoMatchCandidate(
 }
 
 /**
- * 自动匹配免费源逻辑
+ * 按平台内置源健康度排序：健康源多的平台优先尝试
+ * 这样换源时优先跳到"准备好"的平台，减少二次失败
+ */
+function sortSourcesByPlatformHealth(sources: MusicSource[]): MusicSource[] {
+  const { getPlatformStats } = useSourceConfigStore.getState();
+  return [...sources].sort((a, b) => {
+    const statsA = getPlatformStats(a as MusicPlatform);
+    const statsB = getPlatformStats(b as MusicPlatform);
+    // 健康源数量多的优先
+    return (statsB.healthy || 0) - (statsA.healthy || 0);
+  });
+}
+
+/**
+ * 自动匹配免费源逻辑（增强版：按平台健康度排序目标平台）
  * @param track 需要匹配的歌曲
  * @returns 是否匹配并切换成功
  */
@@ -70,12 +86,15 @@ export async function handleAutoMatch(track: MusicTrack): Promise<boolean> {
   try {
     const { updateTrackInQueue, updateTrackInPlaylists, contextId } =
       useMusicStore.getState();
-    const aggregatedSources = getAggregatedSourcesForMatch().filter(
+    const rawSources = getAggregatedSourcesForMatch().filter(
       (source) => source !== track.source
     );
-    if (aggregatedSources.length === 0) {
+    if (rawSources.length === 0) {
       return false;
     }
+
+    // 按平台健康度排序：内置源健康的平台优先
+    const aggregatedSources = sortSourcesByPlatformHealth(rawSources);
     const match = await musicApi.searchBestMatch({
       query: `${track.name} ${track.artist[0]}`,
       sources: aggregatedSources,

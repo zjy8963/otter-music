@@ -245,6 +245,44 @@ export default defineConfig({
       },
     }),
     {
+      name: "thirdparty-proxy",
+      configureServer(server) {
+        server.middlewares.use("/music-api/thirdparty", async (req, res) => {
+          if (req.method !== "POST") {
+            res.statusCode = 405; res.end(JSON.stringify({ ok: false, error: "POST only" })); return;
+          }
+          let raw = "";
+          req.on("data", (c: Buffer) => raw += c.toString());
+          req.on("end", async () => {
+            try {
+              const { url, method = "GET", headers = {}, body } = JSON.parse(raw);
+              if (!url) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "url required" })); return; }
+              const h = new URL(url).hostname;
+              if (h === "localhost" || h === "127.0.0.1" || h.startsWith("192.168.") || h.startsWith("10.")) {
+                res.statusCode = 403; res.end(JSON.stringify({ ok: false, error: "internal host blocked" })); return;
+              }
+              const ctrl = new AbortController();
+              const t = setTimeout(() => ctrl.abort(), 20000);
+              const fetchRes = await fetch(url, {
+                method,
+                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36", ...headers },
+                body: method !== "GET" && method !== "HEAD" ? body : undefined,
+                signal: ctrl.signal,
+              });
+              clearTimeout(t);
+              const ct = fetchRes.headers.get("content-type") || "";
+              const data = ct.includes("application/json") ? await fetchRes.json() : await fetchRes.text();
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ ok: fetchRes.ok, status: fetchRes.status, data }));
+            } catch (e: any) {
+              res.statusCode = 502;
+              res.end(JSON.stringify({ ok: false, error: e.message || "proxy error" }));
+            }
+          });
+        });
+      },
+    },
+    {
       name: "plugin-fetch-proxy",
       configureServer(server) {
         server.middlewares.use(

@@ -163,24 +163,16 @@ async function resolveRemoteAudioUrl({
   trackId,
   source,
   quality,
+  signal,
 }: {
   trackId: string;
   source: MusicSource;
   quality: number;
+  signal?: AbortSignal;
 }): Promise<string> {
-  // 离线时 cachedFetch 磁盘未命中则网络必然不可用，无需重试
-  const maxRetries = navigator.onLine ? 2 : 0;
-  return retry(
-    async () => {
-      const url = await musicApi.getUrl(trackId, source, quality);
-      if (!url) {
-        throw new Error("EMPTY_URL");
-      }
-      return url;
-    },
-    maxRetries,
-    800
-  );
+  const url = await musicApi.getUrl(trackId, source, quality, signal);
+  if (!url) throw new Error("EMPTY_URL");
+  return url;
 }
 
 export function useAudioTrackLoader(
@@ -204,6 +196,7 @@ export function useAudioTrackLoader(
   const urlRecoveryKey = useMusicStore((s) => s.urlRecoveryKey);
 
   const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null); // 切歌时 abort 上一次请求
   const prevUrlRecoveryKeyRef = useRef(urlRecoveryKey);
 
   const prevTrackRef = useRef<{ id?: string; source?: string } | null>(null);
@@ -230,6 +223,11 @@ export function useAudioTrackLoader(
     const currentRequestId = requestId;
 
     const load = async () => {
+      // 切歌：立即 abort 上一次请求的所有 in-flight fetch
+      abortRef.current?.abort();
+      const loadAbort = new AbortController();
+      abortRef.current = loadAbort;
+
       const audio = audioRef.current!;
       const trackKey = `${currentTrackSource}:${currentTrackId}:${currentTrackUrlId ?? ""}`;
       if (fallbackStageRef.current.trackKey !== trackKey) {
@@ -254,6 +252,7 @@ export function useAudioTrackLoader(
           trackId: urlId || "",
           source: currentTrackSource,
           quality: parseInt(quality, 10),
+          signal: loadAbort.signal,
         });
         urlMemoryCache.set(trackKey, remoteUrl);
         remoteUrlRef.current = remoteUrl;

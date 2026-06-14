@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import { QualitySelect } from "./settings/QualitySelect";
 import { AggregatedSourceSelect } from "./settings/AggregatedSourceSelect";
+import { PlatformSourceConfig } from "./settings/PlatformSourceConfig";
 import { SyncConfig } from "./settings/SyncConfig";
 import { NeteaseLogin } from "./settings/NeteaseLogin";
 import { ApiUrlConfig } from "./settings/ApiUrlConfig";
@@ -103,6 +104,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
             }
           />
           <AggregatedSourceSelect />
+          <PlatformSourceConfig />
           <SettingItem
             icon={Volume2}
             title="音量调节"

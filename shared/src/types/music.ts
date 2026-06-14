@@ -34,13 +34,15 @@ export interface SearchPageResult<T = MusicTrack> {
 
 export const searchOptions: Record<string, string> = {
   all: "聚合搜索",
-  joox: "Joox",
   netease: "网易云音乐",
-  _netease: "Netease",
-  kuwo: "酷我音乐",
-  migu: "Migu",
-  bilibili: "B站",
   qq: "QQ音乐",
+  kugou: "酷狗音乐",
+  kuwo: "酷我音乐",
+  bilibili: "B站",
+  migu: "Migu",
+  joox: "Joox",
+  // 保留旧选项以兼容
+  _netease: "Netease",
   lx_kuwo: "小蜗音乐",
   lx_qq: "小秋音乐",
 };
@@ -50,6 +52,7 @@ export const sourceLabels: Record<string, string> = {
   netease: "网易",
   _netease: "Netease",
   kuwo: "酷我",
+  kugou: "酷狗",
   migu: "Migu",
   bilibili: "B站",
   qq: "QQ",
@@ -63,17 +66,25 @@ export const aggregatedSourceOptions: {
   description: string;
 }[] = [
   {
-    value: "joox",
-    label: "Joox",
-    description: "QQ音乐海外版",
-  },
-  {
     value: "netease",
     label: "网易云音乐",
     description: "音源稳定，小众资源多",
   },
-  { value: "_netease", label: "Netease", description: "网易云官方，稳定高速" },
-  { value: "kuwo", label: "酷我音乐", description: "版权丰富，但稳定性一般" },
+  {
+    value: "qq",
+    label: "QQ音乐",
+    description: "版权最全，音质上限高",
+  },
+  {
+    value: "kugou",
+    label: "酷狗音乐",
+    description: "曲库互补，老歌资源多",
+  },
+  {
+    value: "kuwo",
+    label: "酷我音乐",
+    description: "免费资源丰富",
+  },
   {
     value: "bilibili",
     label: "B站",
@@ -81,20 +92,14 @@ export const aggregatedSourceOptions: {
   },
   { value: "migu", label: "Migu", description: "咪咕音乐官方" },
   {
-    value: "qq",
-    label: "QQ音乐",
-    description: "QQ音乐官方",
+    value: "joox",
+    label: "Joox",
+    description: "QQ音乐海外版",
   },
-  {
-    value: "lx_kuwo",
-    label: "小蜗音乐",
-    description: "酷我音源（洛雪）",
-  },
-  {
-    value: "lx_qq",
-    label: "小秋音乐",
-    description: "QQ音源（洛雪）",
-  },
+  // 保留旧选项以兼容
+  { value: "_netease", label: "Netease", description: "网易云官方，稳定高速" },
+  { value: "lx_kuwo", label: "小蜗音乐", description: "酷我音源（洛雪）" },
+  { value: "lx_qq", label: "小秋音乐", description: "QQ音源（洛雪）" },
 ];
 
 export const sourceBadgeStyles: Record<string, string> = {
@@ -125,12 +130,13 @@ export interface SourceConfig {
 
 export const DEFAULT_SOURCE_CONFIGS: SourceConfig[] = [
   { source: "netease", enabled: true, visible: true },
-  { source: "bilibili", enabled: true, visible: true },
-  { source: "_netease", enabled: false, visible: true },
-  { source: "migu", enabled: false, visible: true },
-  { source: "qq", enabled: false, visible: true },
-  { source: "joox", enabled: false, visible: true },
+  { source: "qq", enabled: true, visible: true },
+  { source: "kugou", enabled: true, visible: true },
   { source: "kuwo", enabled: false, visible: true },
+  { source: "bilibili", enabled: true, visible: true },
+  { source: "migu", enabled: false, visible: true },
+  { source: "joox", enabled: false, visible: true },
+  { source: "_netease", enabled: false, visible: true },
   { source: "lx_kuwo", enabled: false, visible: true },
   { source: "lx_qq", enabled: false, visible: true },
 ];

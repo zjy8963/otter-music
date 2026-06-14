@@ -124,7 +124,8 @@ export const musicApi = {
   async getUrl(
     idOrUrl: string,
     source: MusicSource,
-    br = 192
+    br = 192,
+    signal?: AbortSignal
   ): Promise<string | null> {
     if (idOrUrl.startsWith("http")) return idOrUrl;
     const key = `url:${source}:${idOrUrl}:${br}`;
@@ -136,7 +137,8 @@ export const musicApi = {
           const track = { id: idOrUrl, url_id: idOrUrl, source } as MusicTrack;
           return await MusicProviderFactory.getProvider(source).getUrl(
             track,
-            br
+            br,
+            signal
           );
         } catch (e) {
           logger.error("music-api", "getUrl failed", e);

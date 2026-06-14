@@ -16,7 +16,7 @@ export interface IMusicProvider {
     signal?: AbortSignal,
     intent?: SearchIntent | null
   ): Promise<SearchPageResult<MusicTrack>>;
-  getUrl(track: MusicTrack, br?: number): Promise<string | null>;
+  getUrl(track: MusicTrack, br?: number, signal?: AbortSignal): Promise<string | null>;
   getPic(track: MusicTrack, size?: number): Promise<string | null>;
   getLyric(track: MusicTrack): Promise<SongLyric | null>;
 
