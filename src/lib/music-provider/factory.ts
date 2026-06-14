@@ -64,23 +64,87 @@ function createPlatformProviders(): Record<MusicPlatform, IMusicProvider> {
     return searchQqMusic(query, page, signal);
   };
 
-  // 酷狗/酷我搜索暂用 GD Studio API 回退
-  const makeGenericSearch = (platform: MusicPlatform) => {
-    return async (
-      query: string,
-      page: number,
-      count: number,
-      signal?: AbortSignal,
-    ): Promise<SearchPageResult<MusicTrack>> => {
-      const { requestMusicApiJSON, normalizeTrack } = await import("./utils");
-      const json = await requestMusicApiJSON<any[]>(
-        { types: "search", name: query, count, pages: page },
-        platform as any,
-        signal
-      );
-      const items = json.map((t: any) => normalizeTrack(t, platform as any));
-      return { items, hasMore: items.length === count };
-    };
+  // === 酷狗官方搜索 (songsearch.kugou.com/song_search_v2) ===
+  const kugouSearch = async (
+    query: string,
+    page: number,
+    count: number,
+    signal?: AbortSignal,
+  ): Promise<SearchPageResult<MusicTrack>> => {
+    const { apiFetch } = await import("./internal-sources/api-proxy");
+    try {
+      const params = new URLSearchParams({
+        format: "json", keyword: query, platform: "WebFilter",
+        page: String(page), pagesize: String(Math.min(count, 30)),
+      });
+      const data = await apiFetch(`https://songsearch.kugou.com/song_search_v2?${params}`, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      }, signal);
+      const lists: any[] = data?.data?.lists || [];
+      const items: MusicTrack[] = lists.map((s: any) => {
+        const hash = (s.FileHash || s.hash || "").toString();
+        const coverTpl = s.trans_param?.union_cover || "";
+        return {
+          id: `kg_${hash}`,
+          name: s.SongName || s.songname || s.AudioName || "",
+          artist: [s.SingerName || s.singername || ""].filter(Boolean),
+          album: s.AlbumName || s.album_name || "",
+          pic_id: typeof coverTpl === "string" && coverTpl.startsWith("http") ? coverTpl.replace("{size}", "400") : "",
+          url_id: hash,
+          lyric_id: hash,
+          source: "kugou" as const,
+        };
+      });
+      return { items, hasMore: lists.length >= count };
+    } catch { return { items: [], hasMore: false }; }
+  };
+
+  // === 酷我官方搜索 (kuwo.cn/search/searchMusicBykeyWord) ===
+  // 字段名参考 JaurusMusic _extract_kuwo_metadata
+  const kuwoSearch = async (
+    query: string,
+    page: number,
+    count: number,
+    signal?: AbortSignal,
+  ): Promise<SearchPageResult<MusicTrack>> => {
+    const { apiFetch } = await import("./internal-sources/api-proxy");
+    try {
+      const params = new URLSearchParams({
+        vipver: "1", client: "kt", ft: "music", cluster: "0", strategy: "2012",
+        encoding: "utf8", rformat: "json", mobi: "1", issubtitle: "1",
+        show_copyright_off: "1", pn: String(page - 1), rn: String(Math.min(count, 30)),
+        all: query,
+      });
+      const data = await apiFetch(`http://www.kuwo.cn/search/searchMusicBykeyWord?${params}`, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      }, signal);
+      const list: any[] = data?.abslist || [];
+      const items: MusicTrack[] = list.map((s: any) => {
+        // JaurusMusic 字段名: 大写 NAME/ARTIST/ALBUM/MUSICRID，兜底小写
+        const rawRid = s.MUSICRID || s.musicrid || "";
+        const rid = String(rawRid).replace("MUSIC_", "");
+        const artist = s.ARTIST || s.artist || "";
+        // 封面：web_albumpic_short / web_artistpic_short（参考 JaurusMusic）
+        let cover = s.hts_MVPIC || s.albumpic || s.pic || "";
+        if (!cover) {
+          const alb = s.web_albumpic_short;
+          const art = s.web_artistpic_short;
+          if (alb && typeof alb === "string") cover = `https://img4.kuwo.cn/star/albumcover/${alb.replace("120", "500")}`;
+          else if (art && typeof art === "string") cover = `https://img1.kuwo.cn/star/starheads/${art.replace("120", "500")}`;
+        }
+        return {
+          id: `kw_${rid}`,
+          name: s.NAME || s.name || s.songName || s.SONGNAME || "",
+          artist: artist ? artist.split(/[、/&]/).map((a: string) => a.trim()).filter(Boolean) : [],
+          album: s.ALBUM || s.album || "",
+          pic_id: cover,
+          url_id: rid,
+          lyric_id: rid,
+          source: "kuwo" as const,
+        };
+      });
+      return { items, hasMore: items.length >= count };
+    } catch { return { items: [], hasMore: false }; }
   };
 
   return {
@@ -96,12 +160,12 @@ function createPlatformProviders(): Record<MusicPlatform, IMusicProvider> {
     }),
     kugou: new PlatformProvider({
       platform: "kugou",
-      searchImpl: makeGenericSearch("kugou" as MusicPlatform),
+      searchImpl: kugouSearch,
       sourceManager: getPlatformManager("kugou"),
     }),
     kuwo: new PlatformProvider({
       platform: "kuwo",
-      searchImpl: makeGenericSearch("kuwo" as MusicPlatform),
+      searchImpl: kuwoSearch,
       sourceManager: getPlatformManager("kuwo"),
     }),
   };

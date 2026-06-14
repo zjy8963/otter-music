@@ -30,9 +30,8 @@ async function directFetch(url: string, init: RequestInit = {}, signal?: AbortSi
     });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) return await res.json();
-    return await res.text();
+    const raw = await res.text();
+    try { return JSON.parse(raw); } catch { return raw; }
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", () => controller.abort());
@@ -61,6 +60,10 @@ async function proxyFetch(url: string, init: RequestInit = {}, signal?: AbortSig
     clearTimeout(timer);
     const result: ProxyResponse = await res.json();
     if (!result.ok) throw new Error(result.error || `Proxy ${result.status}`);
+    // 兜底：中间件可能因 content-type 非 JSON 而返回字符串 → 尝试 JSON.parse
+    if (typeof result.data === "string") {
+      try { return JSON.parse(result.data); } catch { return result.data; }
+    }
     return result.data;
   } finally {
     clearTimeout(timer);

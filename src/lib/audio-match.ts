@@ -89,18 +89,25 @@ export async function handleAutoMatch(track: MusicTrack): Promise<boolean> {
     const rawSources = getAggregatedSourcesForMatch().filter(
       (source) => source !== track.source
     );
+
+    console.log("[autoMatch] candidates:", rawSources);
     if (rawSources.length === 0) {
+      console.log("[autoMatch] no candidates, aborting");
       return false;
     }
 
-    // 按平台健康度排序：内置源健康的平台优先
     const aggregatedSources = sortSourcesByPlatformHealth(rawSources);
+    console.log("[autoMatch] query:", `${track.name} ${track.artist[0]}`, "platforms:", aggregatedSources);
+
     const match = await musicApi.searchBestMatch({
       query: `${track.name} ${track.artist[0]}`,
       sources: aggregatedSources,
       predicate: (item: MusicTrack) => {
-        if (!isNameMatch(track.name, item.name)) return false;
-        return isArtistMatch(track.artist, item.artist);
+        const nm = isNameMatch(track.name, item.name);
+        const am = isArtistMatch(track.artist, item.artist);
+        if (nm && am) console.log("[autoMatch] candidate match:", item.source, item.name, item.artist);
+        if (!nm) return false;
+        return am;
       },
       ranker: (item, originalIndex) =>
         scoreAutoMatchCandidate(track, item, originalIndex),
@@ -108,9 +115,11 @@ export async function handleAutoMatch(track: MusicTrack): Promise<boolean> {
     });
 
     if (!match) {
+
       toast.error("未找到可用音源", { id: toastId });
       return false;
     }
+
 
     // 仅对 B 站音源保留原歌曲的 name 和 artist，避免标题杂乱与作者错位
     const { bilibiliKeepOriginalMeta } = useMusicStore.getState();

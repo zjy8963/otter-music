@@ -65,7 +65,7 @@ function extractQqFee(song: {
  */
 export function convertQqSongToMusicTrack(song: QqSongRaw): MusicTrack {
   const picUrl = song.albummid
-    ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${song.albummid}.jpg`
+    ? `https://y.gtimg.cn/music/photo_new/T002R800x800M000${song.albummid}.jpg`
     : "";
 
   return {

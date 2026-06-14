@@ -90,7 +90,8 @@ export async function testSingleSource(sourceId: string, signal?: AbortSignal): 
         const hr = await fetch(result, { method: "HEAD", signal: AbortSignal.timeout(3000) });
         const ct = hr.headers.get("content-type");
         const cl = hr.headers.get("content-length");
-        if (ct) fmt = detectFormat(result, ct);
+        // Content-Type 仅作补充（URL 扩展名可信度更高，CDN 常返回错误 MIME）
+        if (ct && fmt === "?") fmt = detectFormat(result, ct);
         if (cl) size = formatBytes(parseInt(cl));
       } catch {
         try {

@@ -32,10 +32,18 @@ function decryptApiKey(encoded: string): string {
 // ============================================================
 export const kwLxmusicHandler: InternalSourceHandler = {
   id: "kw_lxmusic",
-  async resolveUrl(songId, _quality, signal) {
+  async resolveUrl(songId, _quality) {
     try {
-      const { getLxUrl } = await import("@/lib/utils/lx-api");
-      return await getLxUrl("lx_kuwo", songId, 320);
+      const { IS_NATIVE } = await import("@/lib/api/config");
+      if (IS_NATIVE) {
+        const { getLxUrl } = await import("@/lib/utils/lx-api");
+        return await getLxUrl("lx_kuwo", songId, 320);
+      }
+      const { apiFetch } = await import("./api-proxy");
+      const r = await apiFetch(`https://lxmusicapi.onrender.com/url/kw/${songId}/flac`, {
+        headers: { "Content-Type": "application/json", "User-Agent": "lx-music-request/2.6.0", "X-Request-Key": "share-v3" },
+      });
+      return r?.url?.startsWith("http") ? r.url : null;
     } catch {
       return null;
     }

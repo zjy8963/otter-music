@@ -270,8 +270,9 @@ export default defineConfig({
                 signal: ctrl.signal,
               });
               clearTimeout(t);
-              const ct = fetchRes.headers.get("content-type") || "";
-              const data = ct.includes("application/json") ? await fetchRes.json() : await fetchRes.text();
+              const rawText = await fetchRes.text();
+              let data: any;
+              try { data = JSON.parse(rawText); } catch { data = rawText; }
               res.setHeader("Content-Type", "application/json");
               res.end(JSON.stringify({ ok: fetchRes.ok, status: fetchRes.status, data }));
             } catch (e: any) {

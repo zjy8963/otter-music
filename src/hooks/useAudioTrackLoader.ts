@@ -350,14 +350,8 @@ export function useAudioTrackLoader(
         try {
           const primaryUrl = localDownloadUrl || (await getRemoteUrl());
 
-          // 新增：如果是在线 HTTP 链接，执行 1.5 秒快速探测
-          if (!localDownloadUrl && primaryUrl.startsWith("http")) {
-            const isReachable = await checkUrlReachable(primaryUrl, 1500);
-            if (!isReachable) {
-              // 抛出特定错误，直接跳过 8 秒等待，进入 catch 触发代理
-              throw new Error("PRECHECK_UNREACHABLE");
-            }
-          }
+          // checkUrlReachable 用 no-cors 无法真正验证 URL（浏览器 opaque response）
+          // 直接让 audio 元素尝试，失败由 onError → useAudioEventHandlers 处理
 
           await setSourceAndPlay(primaryUrl);
         } catch (primaryError) {
@@ -413,7 +407,9 @@ export function useAudioTrackLoader(
 
         if (useMusicStore.getState().enableAutoMatch) {
           try {
+            console.log("[autoMatch] attempting for", currentTrack.name, currentTrack.source);
             const success = await handleAutoMatch(currentTrack);
+            console.log("[autoMatch] result:", success);
             if (success) return;
           } catch {
             logger.warn("useAudioTrackLoader", "Auto match failed", {

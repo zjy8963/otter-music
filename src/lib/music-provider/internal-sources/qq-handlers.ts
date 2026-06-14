@@ -45,8 +45,7 @@ export const qqVkeysHandler: InternalSourceHandler = {
           signal
         );
         const url = resp?.data?.url;
-        if (url && url.startsWith("http")) return url;
-        // 成功响应但无URL → 该品质不可用，继续降级
+        if (isValidQqUrl(url, songId)) return url;
       } catch {
         continue;
       }
@@ -56,29 +55,37 @@ export const qqVkeysHandler: InternalSourceHandler = {
 };
 
 // ============================================================
-// qq_xcvts — XCVTS API
-// musicdl: _parsewithxcvtsapi
+// 通用 QQ 音频 URL 校验 — 过滤第三方 API 返回的畸形 URL
+// 正常: http://ws.stream.qqmusic.qq.com/C400{songmid}.m4a?guid=...&vkey=...
+// 异常: http://ws.stream.qqmusic.qq.com/&API=api.xcvts.cn (songmid 缺失)
 // ============================================================
-const XCVTS_KEYS = [
-  "Nzg5OTMzNDRiOWJmMTEwNTY1NTU5OTAwOWNkYmEzZDI",
-  "Y2U3NzhlYjBkMTg1OGVkZmI0YjIwNzFhMTE1ZjFlZGY",
-];
+function isValidQqUrl(url: string, songmid: string): boolean {
+  if (!url || !url.startsWith("http")) return false;
+  // URL 中回链到第三方 API 本身 → 异常
+  if (url.includes("api.xcvts.cn") || url.includes("api.vkeys.cn") || url.includes("api.liuyunidc")) return false;
+  // URL 中不含 songmid 且不含常见音频路径 → 可疑
+  if (!url.includes(songmid) && !url.includes(".m4a") && !url.includes(".mp3") && !url.includes(".flac") && !url.includes(".ogg")) return false;
+  return true;
+}
+
+// ============================================================
+// qq_xcvts — XCVTS API
+// ============================================================
+const XCVTS_KEYS = ["Nzg5OTMzNDRiOWJmMTEwNTY1NTU5OTAwOWNkYmEzZDI","Y2U3NzhlYjBkMTg1OGVkZmI0YjIwNzFhMTE1ZjFlZGY"];
 const XCVTS_QUALITIES = ["臻品母带", "臻品全景声", "臻品2.0", "SQ无损", "HQ高品质", "中品质", "普通", "低品质", "试听"];
 
 export const qqXcvtsHandler: InternalSourceHandler = {
   id: "qq_xcvts",
   async resolveUrl(songId, _quality, signal) {
-    // XCVTS 品质从高到低尝试前4个
     for (const q of XCVTS_QUALITIES.slice(0, 4)) {
       try {
         const apiKey = atob(XCVTS_KEYS[Math.floor(Math.random() * XCVTS_KEYS.length)]);
         const resp = await fetchJSON(
           `https://api.xcvts.cn/api/music/qq?apiKey=${encodeURIComponent(apiKey)}&mid=${songId}&type=${encodeURIComponent(q)}`,
-          { headers: BASE_HEADERS },
-          signal
+          { headers: BASE_HEADERS }, signal
         );
         const url = resp?.data?.music;
-        if (url && url.startsWith("http")) return url;
+        if (isValidQqUrl(url, songId)) return url;
       } catch {
         continue;
       }
@@ -93,11 +100,19 @@ export const qqXcvtsHandler: InternalSourceHandler = {
 // ============================================================
 export const qqLxmusicHandler: InternalSourceHandler = {
   id: "qq_lxmusic",
-  async resolveUrl(songId, _quality, signal) {
+  async resolveUrl(songId, _quality) {
     try {
-      // 动态导入以避免循环依赖
-      const { getLxUrl } = await import("@/lib/utils/lx-api");
-      return await getLxUrl("lx_qq", songId, 320);
+      const { IS_NATIVE } = await import("@/lib/api/config");
+      if (IS_NATIVE) {
+        const { getLxUrl } = await import("@/lib/utils/lx-api");
+        return await getLxUrl("lx_qq", songId, 320);
+      }
+      // Web 模式走代理避免 CORS
+      const { apiFetch } = await import("./api-proxy");
+      const r = await apiFetch(`https://lxmusicapi.onrender.com/url/tx/${songId}/320k`, {
+        headers: { "Content-Type": "application/json", "User-Agent": "lx-music-request/2.6.0", "X-Request-Key": "share-v3" },
+      });
+      return r?.url?.startsWith("http") ? r.url : null;
     } catch {
       return null;
     }
@@ -153,10 +168,8 @@ export const qq317akHandler: InternalSourceHandler = {
           signal
         );
         const url = resp?.url;
-        if (url && url.startsWith("http")) return url;
-      } catch {
-        continue;
-      }
+        if (isValidQqUrl(url, songId)) return url;
+      } catch { continue; }
     }
     return null;
   },

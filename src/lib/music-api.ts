@@ -99,6 +99,8 @@ export const musicApi = {
           effectiveCount,
           signal
         );
+        console.log("[autoMatch] searched", source, "→", res.items.length, "results");
+        if (res.items.length > 0) console.log("[autoMatch] first:", res.items[0].name, res.items[0].artist);
         const match = effectiveRanker
           ? res.items
               .map((track, originalIndex) => ({ track, originalIndex }))

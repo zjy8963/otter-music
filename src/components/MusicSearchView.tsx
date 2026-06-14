@@ -244,8 +244,10 @@ export function MusicSearchView({
 
       if (version !== versionRef.current) return;
 
-      let items =
-        source === "all" ? res.items : mergeAndSortTracks(res.items, query);
+      // 单源搜索不需要 mergeAndSort（那是给聚合搜索合并多源用的）
+      let items = source === "all"
+        ? mergeAndSortTracks(res.items, query)
+        : res.items;
       items = applySearchIntentSort(items, searchIntent, query);
 
       const currentLength = reset ? 0 : searchResults.length;
