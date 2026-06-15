@@ -65,7 +65,7 @@ export class PlatformSourceManager {
 
   /** 获取源是否已启用 */
   isEnabled(sourceId: string): boolean {
-    return this.settings.enabled[sourceId] ?? true; // 默认全部启用
+    return this.settings.enabled[sourceId] ?? false; // 默认禁用，需显式开启
   }
 
   /** 切换启用状态 */

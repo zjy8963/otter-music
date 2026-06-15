@@ -19,6 +19,44 @@ export interface SongPic {
 export interface SongLyric {
   lyric: string;
   tlyric?: string;
+  /** 逐字原文歌词（优先使用，存在时表示逐字模式） */
+  orig?: LyricLine[];
+  /** 逐字翻译歌词 */
+  ts?: LyricLine[];
+  /** 逐字罗马音 */
+  roma?: LyricLine[];
+  /** 罗马音歌词文本 (向后兼容) */
+  roma_lrc?: string;
+  /** 元数据标签 */
+  tags?: Record<string, string>;
+}
+
+/** 单个字/词的时间与文本 */
+export interface LyricWord {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** 一行歌词 */
+export interface LyricLine {
+  start: number;
+  end: number;
+  words: LyricWord[];
+}
+
+/** 逐字歌词单词（与 LyricWord 相同结构，用于渲染） */
+export interface VerbateWord {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** 逐字歌词行（与 LyricLine 相同结构，用于渲染） */
+export interface VerbateLine {
+  start: number;
+  end: number;
+  words: VerbateWord[];
 }
 
 export type MergedMusicTrack = MusicTrack & {

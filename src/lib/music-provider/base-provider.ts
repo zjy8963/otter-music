@@ -29,7 +29,7 @@ export abstract class BaseMusicProvider implements IMusicProvider {
     return json.url || null;
   }
 
-  async getLyric(track: MusicTrack): Promise<SongLyric | null> {
+  async getLyric(track: MusicTrack, _signal?: AbortSignal): Promise<SongLyric | null> {
     const json = await requestMusicApiJSON<{ lyric?: string; tlyric?: string }>({ types: 'lyric', id: track.lyric_id }, this.source);
     return { lyric: json.lyric ?? '', tlyric: json.tlyric ?? '' };
   }

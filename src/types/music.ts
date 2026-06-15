@@ -18,4 +18,6 @@ export type {
   SongLyric,
   SongUrl,
   SourceConfig,
+  VerbateLine,
+  VerbateWord,
 } from "@otter-music/shared";

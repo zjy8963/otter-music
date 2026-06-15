@@ -30,7 +30,7 @@ export const INTERNAL_SOURCE_MAP: Record<string, InternalSource> = Object.fromEn
 export const DEFAULT_ENABLED_SOURCES: Record<MusicPlatform, string[]> = {
   netease: ["wy_official", "wy_cgg", "wy_bugpk", "wy_rrvenn"],
   qq: ["qq_official", "qq_xcvts", "qq_vkeys", "qq_lxmusic"],
-  kugou: ["kg_official", "kg_haitangw", "kg_317ak"],
+  kugou: ["kg_haitangw", "kg_317ak", "kg_jbsou"],
   kuwo: ["kw_official", "kw_lxmusic", "kw_haitangw", "kw_nxinxz"],
 };
 

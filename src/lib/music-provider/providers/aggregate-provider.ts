@@ -54,7 +54,7 @@ export class AggregateProvider implements IMusicProvider {
   async getPic(_track: MusicTrack): Promise<string | null> {
     return null;
   }
-  async getLyric(_track: MusicTrack): Promise<SongLyric | null> {
+  async getLyric(_track: MusicTrack, _signal?: AbortSignal): Promise<SongLyric | null> {
     return null;
   }
 }

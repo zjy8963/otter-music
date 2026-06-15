@@ -19,16 +19,35 @@ import { BilibiliApiProvider } from "./providers/bilibili-api-provider";
 import { PlatformProvider } from "./platform-provider";
 import { PlatformSourceManager } from "./source-manager";
 import type { MusicPlatform, MusicTrack, SearchPageResult } from "@otter-music/shared";
+import { useSourceConfigStore } from "@/store/source-config-store";
+
+// 歌词获取实现
+import { fetchNeteaseLyric } from "./lyrics/netease";
+import { fetchQqLyric } from "./lyrics/qq";
+import { fetchKugouLyric } from "./lyrics/kugou";
+import { fetchKuwoLyric } from "./lyrics/kuwo";
 
 /** 平台源管理器单例缓存 */
 const platformManagers = new Map<MusicPlatform, PlatformSourceManager>();
 
-/** 获取或创建平台源管理器 */
+/** 获取或创建平台源管理器（自动从 store 同步配置） */
 function getPlatformManager(platform: MusicPlatform): PlatformSourceManager {
   if (!platformManagers.has(platform)) {
     platformManagers.set(platform, new PlatformSourceManager(platform));
   }
-  return platformManagers.get(platform)!;
+  const mgr = platformManagers.get(platform)!;
+
+  // 每次获取时从 store 同步最新配置
+  const storeConfigs = useSourceConfigStore.getState().configs;
+  const platformConfig = storeConfigs[platform] || {};
+  if (Object.keys(platformConfig).length > 0) {
+    const enabled: Record<string, boolean> = {};
+    for (const [id, cfg] of Object.entries(platformConfig)) {
+      enabled[id] = cfg.enabled;
+    }
+    mgr.applySettingsSnapshot({ enabled });
+  }
+  return mgr;
 }
 
 /**
@@ -152,21 +171,25 @@ function createPlatformProviders(): Record<MusicPlatform, IMusicProvider> {
       platform: "netease",
       searchImpl: neteaseSearch,
       sourceManager: getPlatformManager("netease"),
+      getLyricImpl: fetchNeteaseLyric,
     }),
     qq: new PlatformProvider({
       platform: "qq",
       searchImpl: qqSearch,
       sourceManager: getPlatformManager("qq"),
+      getLyricImpl: fetchQqLyric,
     }),
     kugou: new PlatformProvider({
       platform: "kugou",
       searchImpl: kugouSearch,
       sourceManager: getPlatformManager("kugou"),
+      getLyricImpl: fetchKugouLyric,
     }),
     kuwo: new PlatformProvider({
       platform: "kuwo",
       searchImpl: kuwoSearch,
       sourceManager: getPlatformManager("kuwo"),
+      getLyricImpl: fetchKuwoLyric,
     }),
   };
 }

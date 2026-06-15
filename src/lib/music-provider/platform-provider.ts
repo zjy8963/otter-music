@@ -40,7 +40,7 @@ export interface PlatformProviderConfig {
   /** 封面获取实现 */
   getPicImpl?: (track: MusicTrack, size?: number) => Promise<string | null>;
   /** 歌词获取实现 */
-  getLyricImpl?: (track: MusicTrack) => Promise<SongLyric | null>;
+  getLyricImpl?: (track: MusicTrack, signal?: AbortSignal) => Promise<SongLyric | null>;
   /** 源管理器 */
   sourceManager: PlatformSourceManager;
 }
@@ -173,9 +173,9 @@ export class PlatformProvider implements IMusicProvider {
   // getLyric — 歌词
   // ============================================================
 
-  async getLyric(track: MusicTrack): Promise<SongLyric | null> {
+  async getLyric(track: MusicTrack, signal?: AbortSignal): Promise<SongLyric | null> {
     if (this.config.getLyricImpl) {
-      return this.config.getLyricImpl(track);
+      return this.config.getLyricImpl(track, signal);
     }
     return null;
   }

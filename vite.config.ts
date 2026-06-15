@@ -315,6 +315,46 @@ export default defineConfig({
         );
       },
     },
+    {
+      name: "plugin-binary-proxy",
+      configureServer(server) {
+        server.middlewares.use(
+          "/proxy",
+          async (req: IncomingMessage, res: ServerResponse) => {
+            const reqUrl = new URL(
+              req.url || "",
+              "http://localhost"
+            );
+            const targetUrl = reqUrl.searchParams.get("url");
+            if (!targetUrl) {
+              res.writeHead(400, { "Content-Type": "text/plain" });
+              res.end("missing url parameter");
+              return;
+            }
+            try {
+              const fetchRes = await fetch(targetUrl, {
+                headers: {
+                  "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
+                },
+              });
+              const buf = await fetchRes.arrayBuffer();
+              const headers: Record<string, string> = {
+                "Content-Type":
+                  fetchRes.headers.get("content-type") || "application/octet-stream",
+                "Access-Control-Allow-Origin": "*",
+                "Content-Length": String(buf.byteLength),
+              };
+              res.writeHead(fetchRes.status, headers);
+              res.end(Buffer.from(buf));
+            } catch (e) {
+              res.writeHead(502, { "Content-Type": "text/plain" });
+              res.end("proxy failed: " + (e instanceof Error ? e.message : String(e)));
+            }
+          }
+        );
+      },
+    },
   ],
   resolve: {
     alias: {

@@ -180,7 +180,7 @@ export const musicApi = {
 
   /* ---------------- 歌词 ---------------- */
 
-  async getLyric(id: string, source: MusicSource): Promise<SongLyric | null> {
+  async getLyric(id: string, source: MusicSource, signal?: AbortSignal): Promise<SongLyric | null> {
     const key = `lyric:${source}:${id}`;
 
     return cachedFetch<SongLyric | null>(
@@ -188,8 +188,9 @@ export const musicApi = {
       async () => {
         try {
           const track = { id, lyric_id: id, source } as MusicTrack;
-          return await MusicProviderFactory.getProvider(source).getLyric(track);
+          return await MusicProviderFactory.getProvider(source).getLyric(track, signal);
         } catch (e) {
+          if (e instanceof DOMException && e.name === 'AbortError') return null;
           logger.error("music-api", "getLyric failed", e);
           return null;
         }
