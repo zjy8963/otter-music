@@ -177,9 +177,16 @@ function convertKuwoLrc(rawLrc: string): KuwoLrcResult {
 
     const [, minStr, secStr, msStr, content] = match;
     const lineStartMs = parseInt(minStr, 10) * 60000 + parseInt(secStr, 10) * 1000 + parseInt(msStr, 10);
-    if (content.replace(/<0,0>/g, "").trim() === "") continue;
-
-    const isTranslation = /^<0,0>/.test(content) && TRANSLATION_RE.test(content);
+    let isTranslation = false;
+    if (content.replace(/<0,0>/g, "").trim() !== "") {
+      isTranslation = /^<0,0>/.test(content) && TRANSLATION_RE.test(content);
+    } else {
+      // 空行：无文本内容，仅保留时间戳
+      origLines.push({ start: lineStartMs, end: lineStartMs + 2000,
+        words: [{ start: lineStartMs, end: lineStartMs + 2000, text: "" }] });
+      lyricText.push(`${formatLrcTime(lineStartMs)}`);
+      continue;
+    }
 
     if (isTranslation) {
       const text = content.replace(/<[^>]*>/g, "").trim();

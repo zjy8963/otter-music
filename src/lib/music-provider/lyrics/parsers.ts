@@ -77,13 +77,11 @@ export function parseYrc(yrcText: string): { orig: LyricLine[]; tags: Record<str
             words.push({ start: tMs, end: tMs + 1000, text: item.tx });
           }
         }
-        if (words.length > 0) {
-          lines.push({
-            start: tMs,
-            end: tMs + 1000,
-            words,
-          });
-        }
+        lines.push({
+          start: tMs,
+          end: tMs + 1000,
+          words,
+        });
       } catch {
         // JSON 解析失败，跳过
       }
@@ -109,13 +107,11 @@ export function parseYrc(yrcText: string): { orig: LyricLine[]; tags: Record<str
       const secs = parseFloat(lrcMatch[2]);
       const startMs = Math.round((mins * 60 + secs) * 1000);
       const text = lrcMatch[3].trim();
-      if (text) {
-        lines.push({
-          start: startMs,
-          end: startMs + 2000,
-          words: [{ start: startMs, end: startMs + 2000, text }],
-        });
-      }
+      lines.push({
+        start: startMs,
+        end: startMs + 2000,
+        words: [{ start: startMs, end: startMs + 2000, text }],
+      });
     }
   }
 
@@ -373,9 +369,7 @@ export function dataToLrc(data: LyricLine[]): string {
     const s = (startMs % 60000) / 1000;
     const timestamp = `[${String(m).padStart(2, "0")}:${s.toFixed(2).padStart(5, "0")}]`;
     const text = line.words.map((w) => w.text).join("");
-    if (text.trim()) {
-      lrcLines.push(`${timestamp}${text}`);
-    }
+    lrcLines.push(`${timestamp}${text}`);
   }
   return lrcLines.join("\n");
 }

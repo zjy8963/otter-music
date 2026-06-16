@@ -32,6 +32,8 @@ interface GradientLine {
   nextStartMs: number;
   chars: CharSlot[];
   ttext?: string;
+  /** 空行标记：有时间戳但无歌词文本（如纯乐器间奏） */
+  isEmpty: boolean;
 }
 
 // ============================================================
@@ -77,14 +79,14 @@ function textToCharSlots(text: string, L: number, R: number): CharSlot[] {
   return chars.map((c, i) => ({ char: c, startMs: L + i * dur, durationMs: dur }));
 }
 
-function parseLrcToTimeText(lrc: string): { timeMs: number; text: string }[] {
+function parseLrcToTimeText(lrc: string, keepEmpty?: boolean): { timeMs: number; text: string }[] {
   const out: { timeMs: number; text: string }[] = [];
   for (const line of lrc.split("\n")) {
     const m = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
     if (m) {
       const ms = parseInt(m[1]) * 60000 + parseInt(m[2]) * 1000 + parseInt(m[3].padEnd(3, "0"));
       const text = m[4].trim();
-      if (text) out.push({ timeMs: ms, text });
+      if (text || keepEmpty) out.push({ timeMs: ms, text });
     }
   }
   return out;
@@ -103,7 +105,10 @@ function verbateToGradientLines(res: SongLyric): GradientLine[] {
 
   for (let i = 0; i < origLines.length; i++) {
     const line = origLines[i];
-    if (!line.words || line.words.every((w) => !w.text.trim())) continue;
+    if (!line.words || line.words.every((w) => !w.text.trim())) {
+      raw.push({ startMs: line.start, endMs: line.end || line.start + 2000, chars: [], ttext: undefined, isEmpty: true });
+      continue;
+    }
     const filtered = line.words.filter((w) => w.text !== "\r");
     for (let j = 0; j < filtered.length - 1; j++)
       if (!filtered[j].end || filtered[j].end === filtered[j].start)
@@ -123,13 +128,17 @@ function verbateToGradientLines(res: SongLyric): GradientLine[] {
         tlyricIdx++;
       }
     }
-    raw.push({ startMs: line.start, endMs: lineEnd, chars: wordsToCharSlots(filtered), ttext });
+    raw.push({ startMs: line.start, endMs: lineEnd, chars: wordsToCharSlots(filtered), ttext, isEmpty: false });
   }
-  return raw.map((item, i) => ({ ...item, nextStartMs: raw[i + 1]?.startMs ?? item.endMs + 700 }));
+  return raw.map((item, i) => ({
+    ...item,
+    nextStartMs: raw[i + 1]?.startMs ?? item.endMs + 700,
+    isEmpty: item.chars.length === 0,
+  }));
 }
 
 function simpleToGradientLines(lrc: string, tLrc?: string): GradientLine[] {
-  const tt = parseLrcToTimeText(lrc);
+  const tt = parseLrcToTimeText(lrc, true);
   if (tt.length === 0) return [];
   const lines = tt.map((item, i) => ({
     startMs: item.timeMs,
@@ -145,9 +154,13 @@ function simpleToGradientLines(lrc: string, tLrc?: string): GradientLine[] {
       ttext = tItems[tIdx].text || undefined;
       tIdx++;
     }
-    return { startMs: line.startMs, endMs: line.endMs, chars: textToCharSlots(line.text, line.startMs, line.endMs), ttext };
+    return { startMs: line.startMs, endMs: line.endMs, chars: line.text ? textToCharSlots(line.text, line.startMs, line.endMs) : [], ttext, isEmpty: !line.text };
   });
-  return raw.map((item, i) => ({ ...item, nextStartMs: raw[i + 1]?.startMs ?? item.endMs + 700 }));
+  return raw.map((item, i) => ({
+    ...item,
+    nextStartMs: raw[i + 1]?.startMs ?? item.endMs + 700,
+    isEmpty: item.chars.length === 0,
+  }));
 }
 
 // ============================================================
@@ -169,8 +182,7 @@ const GradientLineView = memo(function GradientLineView({ line }: { line: Gradie
   const prevFillRef = useRef<number[]>([]);
 
   useEffect(() => {
-    const chars = line.chars;
-    const n = chars.length;
+    const n = line.isEmpty ? 3 : line.chars.length;
     const L = line.startMs;
     const R = line.endMs;
     const N = line.nextStartMs;
@@ -204,18 +216,50 @@ const GradientLineView = memo(function GradientLineView({ line }: { line: Gradie
 
       if (c) { c.style.transform = `scale(${scale.toFixed(4)})`; c.style.opacity = opacity.toFixed(3); }
 
-      // ── 高亮 + 从下至上熄灭 ──
-      const holdEnd = Math.max(R + HOLD_FULL_DURATION, N + HOLD_FULL_DURATION);
-      if (now >= holdEnd) {
-        // 保留结束，直接熄灭
-        for (let i = 0; i < n; i++) setCharFill(i, 0);
+      if (line.isEmpty) {
+        // ── 空行动效：三点从左到右渐亮 + 弹性跳跃 ──
+        const totalDuration = Math.max(N - L, 500);
+        const holdEnd = Math.max(R + HOLD_FULL_DURATION, N + HOLD_FULL_DURATION);
+
+        if (now >= holdEnd) {
+          for (let i = 0; i < 3; i++) {
+            setCharFill(i, 0);
+            const el = charRefs.current[i];
+            if (el) el.style.transform = "";
+          }
+        } else {
+          const progress = Math.max(0, Math.min(1, (now - L) / totalDuration));
+          for (let i = 0; i < 3; i++) {
+            const dotStart = i / 3;
+            const dotEnd = (i + 1) / 3;
+            const fill = Math.max(0, Math.min(100, ((progress - dotStart) / (dotEnd - dotStart)) * 100));
+            setCharFill(i, fill);
+
+            // 弹性跳跃：点亮后开始上下弹跳
+            if (fill > 0) {
+              const el = charRefs.current[i];
+              if (el) {
+                const bounce = Math.sin(now * 0.005 + i * 0.9) * 4;
+                el.style.transform = `translateY(${bounce.toFixed(1)}px)`;
+              }
+            }
+          }
+        }
       } else {
-        // 填充 + 保留期
-        for (let i = 0; i < n; i++) {
-          const ch = chars[i];
-          if (now >= ch.startMs + ch.durationMs) setCharFill(i, 100);
-          else if (now < ch.startMs) setCharFill(i, 0);
-          else setCharFill(i, Math.max(0, Math.min(100, ((now - ch.startMs) / ch.durationMs) * 100)));
+        // ── 高亮 + 从下至上熄灭 ──
+        const chars = line.chars;
+        const holdEnd = Math.max(R + HOLD_FULL_DURATION, N + HOLD_FULL_DURATION);
+        if (now >= holdEnd) {
+          // 保留结束，直接熄灭
+          for (let i = 0; i < n; i++) setCharFill(i, 0);
+        } else {
+          // 填充 + 保留期
+          for (let i = 0; i < n; i++) {
+            const ch = chars[i];
+            if (now >= ch.startMs + ch.durationMs) setCharFill(i, 100);
+            else if (now < ch.startMs) setCharFill(i, 0);
+            else setCharFill(i, Math.max(0, Math.min(100, ((now - ch.startMs) / ch.durationMs) * 100)));
+          }
         }
       }
 
@@ -227,24 +271,46 @@ const GradientLineView = memo(function GradientLineView({ line }: { line: Gradie
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       const c = cRef.current;
       if (c) { c.style.transform = ""; c.style.opacity = ""; }
-      for (let i = 0; i < n; i++) { const el = charRefs.current[i]; if (el) el.style.setProperty("--fill", "0%"); }
+      for (let i = 0; i < n; i++) {
+        const el = charRefs.current[i];
+        if (el) { el.style.setProperty("--fill", "0%"); el.style.transform = ""; }
+      }
     };
   }, [line]);
 
   return (
-    <div ref={cRef} className="px-6 sm:px-12 w-full max-w-lg text-center cursor-pointer">
-      <p className="text-lg font-medium leading-8 min-h-8 tracking-wide break-words whitespace-normal">
-        {line.chars.map((ch, i) => (
-          <span key={i} ref={(el) => { charRefs.current[i] = el; }}
-            style={{
-              background: "linear-gradient(to right, white var(--fill), rgba(255,255,255,0.2) var(--fill))",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              backgroundClip: "text", color: "transparent",
-            }}
-          >{ch.char}</span>
-        ))}
-      </p>
-      {line.ttext && <p className="mt-3 font-medium text-[15px] break-words text-white/35">{line.ttext}</p>}
+    <div ref={cRef} className="px-6 sm:px-12 w-full max-w-lg text-center">
+      {line.isEmpty ? (
+        <p className="text-lg font-medium leading-8 min-h-8 tracking-[0.3em] select-none">
+          {[0, 1, 2].map(i => (
+            <span key={i} ref={(el) => { charRefs.current[i] = el; }}
+              className="inline-block"
+              style={{
+                background: "linear-gradient(to right, white var(--fill), rgba(255,255,255,0.1) var(--fill))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >·</span>
+          ))}
+        </p>
+      ) : (
+        <>
+          <p className="text-lg font-medium leading-8 min-h-8 tracking-wide break-words whitespace-normal">
+            {line.chars.map((ch, i) => (
+              <span key={i} ref={(el) => { charRefs.current[i] = el; }}
+                style={{
+                  background: "linear-gradient(to right, white var(--fill), rgba(255,255,255,0.2) var(--fill))",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  backgroundClip: "text", color: "transparent",
+                }}
+              >{ch.char}</span>
+            ))}
+          </p>
+          {line.ttext && <p className="mt-3 font-medium text-[15px] break-words text-white/35">{line.ttext}</p>}
+        </>
+      )}
     </div>
   );
 });
