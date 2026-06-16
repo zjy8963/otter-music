@@ -104,7 +104,7 @@ async function fetchCoverData(track: MusicTrack): Promise<Uint8Array | null> {
 
 async function fetchLyricText(track: MusicTrack): Promise<string | null> {
   try {
-    const result = await musicApi.getLyric(track.lyric_id || track.id, track.source);
+    const result = await musicApi.getLyric(track.lyric_id || track.id, track.lyric_source || track.source);
     if (!result) return null;
     const lines = [result.lyric, result.tlyric].filter(Boolean);
     return lines.join("\n\n");

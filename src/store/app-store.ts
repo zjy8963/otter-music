@@ -16,11 +16,23 @@ interface AppState {
   lastCheckTime: number;
   latestVersionInfo: UpdateInfo | null;
   isChecking: boolean;
+  /** 是否已完成过首次启动初始化 */
+  launchedBefore: boolean;
+  /** 是否启用定时自动测试内置源 */
+  autoTestEnabled: boolean;
+  /** 自动测试间隔（小时） */
+  autoTestIntervalHours: number;
+  /** 上次自动测试时间戳 */
+  lastAutoTestTime: number;
 }
 
 interface AppActions {
   checkUpdate: (silent?: boolean) => Promise<void>;
   resetCheckTime: () => void;
+  setLaunchedBefore: () => void;
+  setAutoTestEnabled: (enabled: boolean) => void;
+  setAutoTestIntervalHours: (hours: number) => void;
+  setLastAutoTestTime: (time: number) => void;
 }
 
 const initialState: AppState = {
@@ -28,6 +40,10 @@ const initialState: AppState = {
   lastCheckTime: 0,
   latestVersionInfo: null,
   isChecking: false,
+  launchedBefore: false,
+  autoTestEnabled: true,
+  autoTestIntervalHours: 24,
+  lastAutoTestTime: 0,
 };
 
 /* =========================
@@ -127,6 +143,10 @@ export const useAppStore = create<AppState & AppActions>()(
       },
 
       resetCheckTime: () => set({ lastCheckTime: 0 }),
+      setLaunchedBefore: () => set({ launchedBefore: true }),
+      setAutoTestEnabled: (enabled) => set({ autoTestEnabled: enabled }),
+      setAutoTestIntervalHours: (hours) => set({ autoTestIntervalHours: hours }),
+      setLastAutoTestTime: (time) => set({ lastAutoTestTime: time }),
     }),
     {
       name: storeKey.AppStore,
@@ -134,6 +154,10 @@ export const useAppStore = create<AppState & AppActions>()(
       partialize: (state) => ({
         lastCheckTime: state.lastCheckTime,
         latestVersionInfo: state.latestVersionInfo,
+        launchedBefore: state.launchedBefore,
+        autoTestEnabled: state.autoTestEnabled,
+        autoTestIntervalHours: state.autoTestIntervalHours,
+        lastAutoTestTime: state.lastAutoTestTime,
       }),
     }
   )

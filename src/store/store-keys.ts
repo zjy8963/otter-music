@@ -10,4 +10,5 @@ export enum storeKey {
   NeteaseStore = "oh_netease_store",
   OfflineStore = "oh_offline_store",
   SourceConfigStore = "oh_source_config_store",
+  LyricsMatchStore = "oh_lyrics_match_store",
 }

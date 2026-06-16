@@ -182,6 +182,14 @@ export function MusicTrackItem({
                 {sourceLabels[track.source] || track.source}
               </Badge>
             )}
+            {track.lyric_source && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-[9px] px-1 py-0 h-3.5 leading-none font-normal text-muted-foreground border-dashed"
+              >
+                词:{sourceLabels[track.lyric_source] || track.lyric_source}
+              </Badge>
+            )}
 
             {badge && (
               <Badge

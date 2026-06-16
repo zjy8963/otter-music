@@ -151,13 +151,31 @@ function PlatformCard({ platform }: { platform: MusicPlatform }) {
 
 export function PlatformSourceConfig() {
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<MusicPlatform>("netease");
   const { liuyunKey, setLiuyunKey } = useSourceConfigStore();
   const platforms: MusicPlatform[] = ["netease", "qq", "kugou", "kuwo"];
+
   return (
     <SettingItem icon={Music} title="平台内置源" subtitle="管理各平台音源解析端点 · 点击圆圈单独测试" onClick={() => setExpanded(!expanded)} showChevron isExpanded={expanded}
       expandedContent={
         <div className="space-y-2">
-          {platforms.map(p => <PlatformCard key={p} platform={p} />)}
+          {/* 平台 Tab 切换 */}
+          <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+            {platforms.map(p => (
+              <button
+                key={p}
+                onClick={() => setActiveTab(p)}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  activeTab === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {PLATFORM_LABELS[p]}
+              </button>
+            ))}
+          </div>
+          {/* 当前平台 */}
+          <PlatformCard platform={activeTab} />
           {/* 流云IDC Key */}
           <div className="rounded-xl bg-card/50 border border-border/50 p-3">
             <div className="flex items-center gap-2">

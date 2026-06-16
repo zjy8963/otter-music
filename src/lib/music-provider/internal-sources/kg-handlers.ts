@@ -99,11 +99,7 @@ export const kgLiuyunidcHandler: InternalSourceHandler = {
 // musicdl: _parsewith317akapi
 // br: 6=母带, 5=全景声, 4=无损, 3=320k, 2=192k, 1=128k
 // ============================================================
-const AK317_KEYS_KG = [
-  "UE9WTUhLSklYOEE3SUdIMkZNMVA",
-  "WE1VS0lBSjNQOExQWDNQOTcxS1U",
-  "N0tUSTUyVDdWTE9EUjZTVDM3UFQ",
-];
+const AK317_KEYS_KG = ['charlespikachuUE9WTUhLSklYOEE3SUdIMkZNMVA=', 'charlespikachuWE1VS0lBSjNQOExQWDNQOTcxS1U=', 'charlespikachuN0tUSTUyVDdWTE9EUjZTVDM3UFQ='];
 
 export const kg317akHandler: InternalSourceHandler = {
   id: "kg_317ak",
@@ -151,11 +147,11 @@ export const kgJbsouHandler: InternalSourceHandler = {
         },
         signal
       );
-      const url = resp?.data?.[0]?.url;
-      if (url && url.startsWith("/")) {
-        return `https://www.jbsou.cn${url}`;
-      }
-      return url && url.startsWith("http") ? url : null;
+      const rel = resp?.data?.[0]?.url;
+      if (!rel) return null;
+      // url 可能是 "api.php?get=url&..."（无前导 /）或绝对路径或完整 URL
+      if (rel.startsWith("http")) return rel;
+      return new URL(rel, "https://www.jbsou.cn/").href;
     } catch {
       return null;
     }

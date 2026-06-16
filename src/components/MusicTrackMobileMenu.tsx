@@ -17,6 +17,8 @@ import {
   Disc,
   MessageSquareQuote,
   Link2,
+  AlignJustify,
+  Undo2,
 } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { MusicCover } from "./MusicCover";
@@ -26,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { useMusicStore } from "@/store/music-store";
 import { MusicProviderFactory } from "@/lib/music-provider";
 import { MusicCommentsDrawer } from "./MusicCommentsDrawer";
+import { LyricsMatchDrawer, type LyricsMatchResult } from "./LyricsMatchDrawer";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +57,8 @@ interface MusicTrackMobileMenuProps {
   customActions?: ReactNode;
   triggerClassName?: string;
   onNavigate?: () => void;
+  onLyricsMatchConfirm?: (result: LyricsMatchResult) => void;
+  onRestoreLyric?: () => void;
 }
 
 const ActionButton = ({
@@ -92,11 +97,14 @@ export function MusicTrackMobileMenu({
   customActions,
   triggerClassName,
   onNavigate,
+  onLyricsMatchConfirm,
+  onRestoreLyric,
 }: MusicTrackMobileMenuProps) {
   const coverUrl = useMusicCover(track, open);
   const navigate = useNavigate();
   const [showArtistSelection, setShowArtistSelection] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showLyricsMatch, setShowLyricsMatch] = useState(false);
 
   // Zustand Store
   const setSearchQuery = useMusicStore((s) => s.setSearchQuery);
@@ -295,6 +303,32 @@ export function MusicTrackMobileMenu({
               </ActionButton>
             )}
 
+            {/* 歌词匹配 — 非播客音源且有歌手信息 */}
+            {track.source !== "podcast" && track.artist?.length > 0 && onLyricsMatchConfirm && (
+              <ActionButton
+                icon={AlignJustify}
+                onClick={() => {
+                  onOpenChange(false);
+                  setShowLyricsMatch(true);
+                }}
+              >
+                歌词匹配
+              </ActionButton>
+            )}
+
+            {/* 恢复原始歌词 */}
+            {track.lyric_source && onRestoreLyric && (
+              <ActionButton
+                icon={Undo2}
+                onClick={() => {
+                  onOpenChange(false);
+                  onRestoreLyric();
+                }}
+              >
+                恢复原始歌词
+              </ActionButton>
+            )}
+
             {/* 除播客外，有歌手即显示歌手入口 */}
             {track.source !== "podcast" && track.artist?.length > 0 && (
               <ActionButton
@@ -398,6 +432,17 @@ export function MusicTrackMobileMenu({
         open={showComments}
         onOpenChange={setShowComments}
       />
+      {onLyricsMatchConfirm && (
+        <LyricsMatchDrawer
+          key={track.id}
+          track={track}
+          open={showLyricsMatch}
+          onOpenChange={setShowLyricsMatch}
+          onConfirm={onLyricsMatchConfirm}
+          hasMatchedLyric={!!track.lyric_source}
+          onRestoreOriginal={() => onRestoreLyric?.()}
+        />
+      )}
     </div>
   );
 }

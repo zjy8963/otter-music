@@ -109,14 +109,25 @@ function verbateToGradientLines(res: SongLyric): GradientLine[] {
       raw.push({ startMs: line.start, endMs: line.end || line.start + 2000, chars: [], ttext: undefined, isEmpty: true });
       continue;
     }
-    const filtered = line.words.filter((w) => w.text !== "\r");
+    let filtered = line.words.filter((w) => w.text !== "\r");
+    // 如果字的绝对时间戳与行开始时间有显著偏移（如 Hello 的异常 YRC），
+    // 按偏移量整体平移，使高亮与音频播放同步
+    const firstWordStart = filtered[0]?.start ?? 0;
+    if (firstWordStart - line.start > 1000 && line.start >= 0) {
+      const shift = firstWordStart - line.start;
+      filtered = filtered.map((w) => ({ ...w, start: w.start - shift, end: w.end - shift }));
+    }
     for (let j = 0; j < filtered.length - 1; j++)
       if (!filtered[j].end || filtered[j].end === filtered[j].start)
         filtered[j] = { ...filtered[j], end: filtered[j + 1].start };
     const last = filtered[filtered.length - 1];
     if (last && (!last.end || last.end === last.start))
       filtered[filtered.length - 1] = { ...last, end: line.end || last.start + 500 };
-    const lineEnd = line.end || filtered[filtered.length - 1]?.end || line.start + 2000;
+    // 行的结束时间：取字的时间戳和行声明 duration 中的较大者
+    // （平移后字的时间跨度可能偏短，行声明 duration 作为保底）
+    const wordEnd = filtered[filtered.length - 1]?.end || 0;
+    const declaredEnd = line.end || 0;
+    const lineEnd = Math.max(wordEnd, declaredEnd) || line.start + 2000;
 
     let ttext: string | undefined;
     if (tsLines[i]) {
@@ -343,6 +354,7 @@ export function LyricsPanel({ track, active = true }: LyricsPanelProps) {
   const trackId = track?.id ?? null;
   const lyricId = track?.lyric_id ?? null;
   const source = track?.source ?? null;
+  const lyricSource = track?.lyric_source ?? null;
 
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -381,7 +393,7 @@ export function LyricsPanel({ track, active = true }: LyricsPanelProps) {
     if (!trackId || !source || !active) return;
     if (!lyricId) { queueMicrotask(() => { setLoading(false); setError("暂无歌词"); setGradientLines([]); }); return; }
     const abort = new AbortController(); let cancelled = false;
-    musicApi.getLyric(lyricId, source, abort.signal)
+    musicApi.getLyric(lyricId, source, abort.signal, lyricSource || undefined)
       .then((res) => {
         if (cancelled) return;
         if (!res) { setError("暂无歌词"); return; }
@@ -394,7 +406,7 @@ export function LyricsPanel({ track, active = true }: LyricsPanelProps) {
       .catch(() => { if (!cancelled) setError("歌词加载失败"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; abort.abort(); };
-  }, [trackId, lyricId, source, active]);
+  }, [trackId, lyricId, source, lyricSource, active]);
 
   // 歌词首次加载时，立即滚到待放歌词位置
   const didInitialScroll = useRef(false);

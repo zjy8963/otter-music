@@ -235,6 +235,9 @@ export interface MusicTrack {
   url_id: string;
   lyric_id: string;
   source: MusicSource;
+  /** 歌词来源平台覆盖（跨平台歌词匹配后设置）。
+   *  存在时，getLyric 使用此字段而非 source 决定从哪个平台获取歌词。 */
+  lyric_source?: MusicSource;
   update_time?: number;
   is_deleted?: boolean;
   privilege?: NeteasePrivilege;

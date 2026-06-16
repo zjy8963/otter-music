@@ -13,9 +13,10 @@ import {
   useMusicStore,
   type FullScreenBackgroundMode,
 } from "@/store/music-store";
+import { useAppStore } from "@/store";
 import { useShallow } from "zustand/react/shallow";
 import { Slider } from "./ui/slider";
-import { Image, Palette, Volume2, Wand2, Trash2, Tag, Tv } from "lucide-react";
+import { Image, Palette, Volume2, Wand2, Trash2, Tag, Tv, RefreshCw } from "lucide-react";
 import { Switch } from "./ui/switch";
 import {
   Select,
@@ -58,6 +59,7 @@ function SettingsSection({
 
 export function SettingsPage({ onBack }: SettingsPageProps) {
   const navigate = useNavigate();
+  const { autoTestEnabled, autoTestIntervalHours, setAutoTestEnabled, setAutoTestIntervalHours } = useAppStore();
   const {
     volume,
     setVolume,
@@ -105,6 +107,40 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           />
           <AggregatedSourceSelect />
           <PlatformSourceConfig />
+          <SettingItem
+            icon={RefreshCw}
+            title="内置源自检"
+            subtitle="启动时自动测试已启用源并关闭失效源"
+            action={
+              <Switch
+                checked={autoTestEnabled}
+                onCheckedChange={setAutoTestEnabled}
+              />
+            }
+          />
+          {autoTestEnabled && (
+            <SettingItem
+              icon={RefreshCw}
+              title="自检间隔"
+              action={
+                <Select
+                  value={String(autoTestIntervalHours)}
+                  onValueChange={(v) => setAutoTestIntervalHours(Number(v))}
+                >
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">每 6 小时</SelectItem>
+                    <SelectItem value="12">每 12 小时</SelectItem>
+                    <SelectItem value="24">每 24 小时</SelectItem>
+                    <SelectItem value="48">每 48 小时</SelectItem>
+                    <SelectItem value="168">每周</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+            />
+          )}
           <SettingItem
             icon={Volume2}
             title="音量调节"

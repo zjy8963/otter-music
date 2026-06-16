@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { LyricsPanel } from "./LyricsPanel";
 import { MusicCover } from "./MusicCover";
 import { PlayerProgressBar } from "./PlayerProgressBar";
-import { MusicTrack } from "@/types/music";
+import { MusicTrack, sourceLabels, type MusicSource } from "@/types/music";
 import {
   ChevronDown,
   Heart,
@@ -22,9 +22,11 @@ import {
   SquareArrowOutUpRight,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
 import { useMounted } from "@/hooks/use-mounted";
 import { PlayerQueueDrawer } from "./PlayerQueueDrawer";
 import { MusicTrackMobileMenu } from "./MusicTrackMobileMenu";
+import type { LyricsMatchResult } from "./LyricsMatchDrawer";
 import { AddToPlaylistDrawer } from "./AddToPlaylistDrawer";
 import { downloadMusicTrack } from "@/lib/utils/download";
 import {
@@ -194,6 +196,7 @@ export function FullScreenPlayer({
     playTrackAsNext,
     currentAudioUrl,
     fullScreenBackgroundMode,
+    updateTrackInQueue,
   } = useMusicStore(
     useShallow((state) => ({
       queue: state.queue,
@@ -206,6 +209,7 @@ export function FullScreenPlayer({
       currentAudioUrl: state.currentAudioUrl,
       quality: state.quality,
       fullScreenBackgroundMode: state.fullScreenBackgroundMode,
+      updateTrackInQueue: state.updateTrackInQueue,
     }))
   );
 
@@ -225,6 +229,45 @@ export function FullScreenPlayer({
   const handleRemoveFromQueue = (track: MusicTrack) => {
     removeFromQueue(track.id);
   };
+
+  // ========== 歌词匹配 ==========
+
+  const lyricOriginalsRef = useRef<Map<string, { lyric_id: string; lyric_source?: MusicSource }>>(new Map());
+
+  const handleLyricsMatchConfirm = useCallback((result: LyricsMatchResult) => {
+    if (!currentTrack) return;
+    // 保存原始歌词元数据（仅在首次匹配时）
+    if (!lyricOriginalsRef.current.has(currentTrack.id)) {
+      lyricOriginalsRef.current.set(currentTrack.id, {
+        lyric_id: currentTrack.lyric_id,
+        lyric_source: currentTrack.lyric_source,
+      });
+    }
+    const updated: MusicTrack = {
+      ...currentTrack,
+      lyric_id: result.lyricId,
+      lyric_source: result.lyricSource,
+    };
+    updateTrackInQueue(currentTrack.id, updated);
+    toast.success(
+      `已切换至「${result.matchedName}」的${
+        result.lyricMode === "word" ? "逐字" : "逐行"
+      }歌词`
+    );
+  }, [currentTrack, updateTrackInQueue]);
+
+  const handleRestoreLyric = useCallback(() => {
+    if (!currentTrack || !currentTrack.lyric_source) return;
+    const orig = lyricOriginalsRef.current.get(currentTrack.id);
+    const restored: MusicTrack = {
+      ...currentTrack,
+      lyric_id: orig?.lyric_id || currentTrack.id,
+      lyric_source: orig?.lyric_source,
+    };
+    lyricOriginalsRef.current.delete(currentTrack.id);
+    updateTrackInQueue(currentTrack.id, restored);
+    toast.success("已恢复原始歌词");
+  }, [currentTrack, updateTrackInQueue]);
 
   const handleShare = async () => {
     if (!currentTrack) return toast.error("暂无歌曲信息");
@@ -383,6 +426,14 @@ export function FullScreenPlayer({
             </h2>
             <p className="truncate text-sm text-white/60 mt-1">
               {currentTrack?.artist?.join(", ") || "未知歌手"}
+              {currentTrack?.lyric_source && (
+                <Badge
+                  variant="outline"
+                  className="ml-2 text-[10px] px-1 py-0 h-4 border-white/20 text-white/50 bg-white/5"
+                >
+                  歌词：{sourceLabels[currentTrack.lyric_source] || currentTrack.lyric_source}
+                </Badge>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -422,6 +473,8 @@ export function FullScreenPlayer({
                   onNavigate={() => {
                     onClose();
                   }}
+                  onLyricsMatchConfirm={handleLyricsMatchConfirm}
+                  onRestoreLyric={handleRestoreLyric}
                 />
                 <AddToPlaylistDrawer
                   open={isAddToPlaylistOpen}

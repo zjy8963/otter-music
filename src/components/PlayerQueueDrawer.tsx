@@ -17,7 +17,8 @@ import { useMusicCover } from "@/hooks/useMusicCover";
 import { cn } from "@/lib/utils";
 import { useHistoryStore } from "@/store/history-store";
 import { useMusicStore } from "@/store/music-store";
-import type { MusicTrack } from "@/types/music";
+import { sourceLabels, type MusicTrack } from "@/types/music";
+import { Badge } from "@/components/ui/badge";
 
 interface PlayerQueueDrawerProps {
   queue: MusicTrack[];
@@ -106,6 +107,14 @@ function QueueTrackItem({
         </span>
         <span className="text-[13px] text-muted-foreground/70 truncate leading-snug">
           {track.artist.join(" / ")}
+          {track.lyric_source && (
+            <Badge
+              variant="outline"
+              className="ml-1.5 shrink-0 text-[9px] px-1 py-0 h-3.5 leading-none font-normal text-muted-foreground/50 border-dashed inline-flex align-middle"
+            >
+              词:{sourceLabels[track.lyric_source] || track.lyric_source}
+            </Badge>
+          )}
         </span>
       </div>
 

@@ -4,6 +4,7 @@
 // ============================================================
 
 import type { InternalSourceHandler } from "./base";
+import { aesGcmEncrypt, aesGcmDecrypt, hmacSha256 } from "./aes-crypto";
 import { IS_NATIVE, getApiUrl } from "@/lib/api/config";
 import { apiFetch } from "./api-proxy";
 const j = apiFetch; // 别名，所有 handler 中 j() 自动走 CORS 代理
@@ -57,9 +58,50 @@ export const wyXuanluogeHandler: InternalSourceHandler = {
   async resolveUrl(sid) { return tryQualities(async (q)=>{ const r=await j(`http://118.24.104.108:3456/api.php?miss=getMusicUrl&id=${sid}&level=${q}`,{headers:H}); return r?.data?.[0]?.url?.startsWith("http")?r.data[0].url:null; }); }
 };
 
+// wy_znnu — music.znnu.com: HMAC-SHA256 签名 + AES-GCM 加解密
+const ZNNU_HMAC_KEY = new TextEncoder().encode("a09d0f3700a279584e1515354fbe08a7ee1c617f919543142fa625b82f1b5ad0").buffer as ArrayBuffer;
 export const wyZnnunHandler: InternalSourceHandler = {
   id: "wy_znnu",
-  async resolveUrl(sid) { try { const u=`${getApiUrl()}/music-api/wy-thirdparty/znnu`; const r=await j(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:sid})}); return r?.url?.startsWith("http")?r.url:null; } catch { return null; } }
+  async resolveUrl(sid) {
+    try {
+      // 1. 获取 key
+      const keyRes = await j("https://music.znnu.com/api/key", { headers: H });
+      const keyToken = keyRes?.data?.keyToken;
+      const b64Key = keyRes?.data?.key;
+      if (!keyToken || !b64Key) return null;
+      const aesKey = new Uint8Array([...atob(b64Key)].map(c => c.charCodeAt(0))).buffer as ArrayBuffer;
+
+      // 2. 逐音质尝试
+      return tryQualities(async (q) => {
+        const ip = (() => { const o=[]; for(let i=0;i<4;i++) o.push(Math.floor(Math.random()*256)); return o.join("."); })();
+        const params: Record<string,string> = { act: "song", id: sid, level: q, rawInput: `https://music.163.com/#/song?id=${sid}`, ip };
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        const domain = "music.znnu.com";
+        // HMAC 签名
+        const signStr = timestamp + domain + Object.keys(params).filter(k => !["signature","timestamp","domain","ver"].includes(k)).sort().map(k => k+"="+params[k]).join("");
+        const signature = await hmacSha256(ZNNU_HMAC_KEY, signStr);
+
+        const body = new URLSearchParams({ ...params, timestamp, domain, signature });
+        const res = await j("https://music.znnu.com/api/song", {
+          method: "POST",
+          headers: {
+            ...H,
+            "X-Key-Token": keyToken,
+            "X-Referer": "musicParser",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://music.znnu.com/",
+            "Origin": "https://music.znnu.com",
+          },
+          body: body.toString(),
+        });
+        const enc = res?.data;
+        if (!enc?.iv || !enc?.ciphertext || !enc?.tag) return null;
+        const dec = await aesGcmDecrypt(enc.iv, enc.ciphertext, enc.tag, aesKey);
+        const data = JSON.parse(new TextDecoder().decode(dec));
+        return data?.url?.startsWith("http") ? data.url : null;
+      });
+    } catch { return null; }
+  }
 };
 
 export const wyKangqiovoHandler: InternalSourceHandler = {
@@ -67,9 +109,44 @@ export const wyKangqiovoHandler: InternalSourceHandler = {
   async resolveUrl(sid) { return tryQualities(async (q)=>{ const r=await j("https://ncm.kangqiovo.com/Song_V1",{method:"POST",headers:{...H,Referer:"https://ncm.kangqiovo.com/","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({url:sid,level:q,type:"json"})}); return r?.data?.url?.startsWith("http")?r.data.url:null; }); }
 };
 
+// wy_xiaoqin — nextmusic.toubiec.cn: AES-GCM 加解密
 export const wyXiaoqinHandler: InternalSourceHandler = {
   id: "wy_xiaoqin",
-  async resolveUrl(sid) { try { const u=`${getApiUrl()}/music-api/wy-thirdparty/xiaoqin`; const r=await j(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:sid})}); return r?.url?.startsWith("http")?r.url:null; } catch { return null; } }
+  async resolveUrl(sid) {
+    try {
+      const baseHeaders = { ...H, "Origin": "https://wyapi.toubiec.cn", "Referer": "https://wyapi.toubiec.cn/" };
+      return tryQualities(async (q) => {
+        // 1. 获取 key
+        const keyRes = await j("https://nextmusic.toubiec.cn/api/key", { method: "POST", headers: baseHeaders });
+        const keyId = keyRes?.data?.keyId;
+        const keyToken = keyRes?.data?.keyToken;
+        const b64Key = keyRes?.data?.key;
+        if (!keyId || !keyToken || !b64Key) return null;
+        const aesKey = new Uint8Array([...atob(b64Key)].map(c => c.charCodeAt(0))).buffer as ArrayBuffer;
+
+        // 2. 加密请求 payload
+        const payload = { id: String(sid), level: q, timestamp: Date.now() };
+        const jsonBytes = new TextEncoder().encode(JSON.stringify(payload));
+        const enc = await aesGcmEncrypt(jsonBytes, aesKey);
+
+        // 3. 请求 getSongUrl
+        const res = await j("https://nextmusic.toubiec.cn/api/getSongUrl", {
+          method: "POST",
+          headers: { ...baseHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({ keyId, keyToken, data: enc.nonce + "." + enc.tag + "." + enc.ciphertext }),
+        });
+        const ciphertext = res?.ciphertext;
+        if (!ciphertext) return null;
+
+        // 4. 解密响应
+        const parts = String(ciphertext).split(".");
+        if (parts.length !== 3) return null;
+        const dec = await aesGcmDecrypt(parts[0], parts[2], parts[1], aesKey);
+        const data = JSON.parse(new TextDecoder().decode(dec));
+        return data?.data?.url?.startsWith("http") ? data.data.url : null;
+      });
+    } catch { return null; }
+  }
 };
 
 const XM_KEYS=["YTU4OWY1M2ZlNDI4Yjk1YzAyOTI2MWFhYzQ2ZTYxM2NjZjhlYThjOTk3ZjZjNTMzYjM1ZjQ4NzNiN2Y1YWI1OA","NjFkMzcyNDVlNTIwYmE1NzE1MmQxNzEyMTg5YmNjYWUyNTUwNjhiMzkxZDk3NDFkYTI3N2ExOGM3ZWQ2OTQyYQ","ZjkwNjkzYjM2ODFjY2EwMDA4YjNmOTAxNTVjNWY4MDU3ZmM0YTQ4Zjk2MzgxNmFiNTMzZGQxNzViYzhiOTAxZQ"];
@@ -106,7 +183,19 @@ export const wyJfjtHandler: InternalSourceHandler = {
 // wy_nanorocky — musicdl: https://metingapi.nanorocky.top/?server=netease&type=url&id=X&br=2000
 export const wyNanorockyHandler: InternalSourceHandler = {
   id: "wy_nanorocky",
-  async resolveUrl(sid) { try { const r=await j(`https://metingapi.nanorocky.top/?server=netease&type=url&id=${sid}&br=2000`,{headers:H}); return r?.url?.startsWith("http")?r.url:null; } catch { return null; } }
+  // meting API 直接返回 audio/mpeg 流，URL 本身即可播放
+  async resolveUrl(sid) {
+    const url = `https://metingapi.nanorocky.top/?server=netease&type=url&id=${sid}&br=2000`;
+    // 快速探测是否可用（HEAD 请求或超短 GET）
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 5000);
+      const r = await fetch(url, { method: "HEAD", signal: ctl.signal });
+      clearTimeout(t);
+      if (r.ok) return url;
+    } catch { /* HEAD 可能不被支持，直接返回 URL 让播放器尝试 */ }
+    return url;
+  }
 };
 
 // wy_manshuo
@@ -158,7 +247,7 @@ export const wyByfunsHandler: InternalSourceHandler = {
 };
 
 // wy_xcvts (for netease)
-const XCVTS_KEYS_WY=["ZTA5NDg3ZjVlYjNiZjJmYjIzODQyMDRlNjI3OTYyMWI","MTQ5NThjZGYxOTVlZDc2ODY1YWRhNDM4NzZjMzcxNGM"];
+const XCVTS_KEYS_WY=['charlespikachuZTA5NDg3ZjVlYjNiZjJmYjIzODQyMDRlNjI3OTYyMWI=', 'charlespikachuMTQ5NThjZGYxOTVlZDc2ODY1YWRhNDM4NzZjMzcxNGM='];
 export const wyXcvtsHandler: InternalSourceHandler = {
   id: "wy_xcvts",
   async resolveUrl(sid) { try { const k=dk(XCVTS_KEYS_WY[Math.floor(Math.random()*XCVTS_KEYS_WY.length)]); const r=await j(`https://api.xcvts.cn/api/music/163music?apiKey=${encodeURIComponent(k)}&id=${sid}&br=999000`,{headers:H}); return r?.data?.music?.startsWith("http")?r.data.music:null; } catch { return null; } }
@@ -171,14 +260,14 @@ export const wyCeseetHandler: InternalSourceHandler = {
 };
 
 // wy_xianyuw (for netease)
-const XIANYUW_KEYS_WY=["ODRiMzc5N2Y5MTg0ODFmZGE0ZDkxMWMwZjYzYjc0MzE"];
+const XIANYUW_KEYS_WY=["charlespikachuc2stODRiMzc5N2Y5MTg0ODFmZGE0ZDkxMWMwZjYzYjc0MzE="];
 export const wyXianyuwHandler: InternalSourceHandler = {
   id: "wy_xianyuw",
   async resolveUrl(sid) { try { const k=dk(XIANYUW_KEYS_WY[0]); const r=await j(`https://apii.xianyuw.cn/api/v1/163-music-search?id=${sid}&key=${encodeURIComponent(k)}&no_url=0&br=hires`,{headers:H}); return r?.data?.url?.startsWith("http")?r.data.url:null; } catch { return null; } }
 };
 
 // wy_xunjinlu
-const XJL_KEYS=["OWUyMjQ5NzhkNjk2MjRjM2JiYjFmNWEzOTg1YmE1ZmQ"];
+const XJL_KEYS=["charlespikachuc2tfOWUyMjQ5NzhkNjk2MjRjM2JiYjFmNWEzOTg1YmE1ZmQ="];
 export const wyXunjinluHandler: InternalSourceHandler = {
   id: "wy_xunjinlu",
   async resolveUrl(sid) { return tryQualities(async (q)=>{ const k=dk(XJL_KEYS[0]); const r=await j(`https://api.xunjinlu.fun/api/wyy/dg/v2.php?action=url&id=${sid}&key=${encodeURIComponent(k)}&quality=${q}`,{headers:H}); return r?.data?.urls?.[0]?.url?.startsWith("http")?r.data.urls[0].url:null; }); }

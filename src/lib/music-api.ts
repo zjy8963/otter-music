@@ -180,15 +180,16 @@ export const musicApi = {
 
   /* ---------------- 歌词 ---------------- */
 
-  async getLyric(id: string, source: MusicSource, signal?: AbortSignal): Promise<SongLyric | null> {
-    const key = `lyric:${source}:${id}`;
+  async getLyric(id: string, source: MusicSource, signal?: AbortSignal, lyricSource?: MusicSource): Promise<SongLyric | null> {
+    const effectiveSource = lyricSource || source;
+    const key = `lyric:${effectiveSource}:${id}`;
 
     return cachedFetch<SongLyric | null>(
       key,
       async () => {
         try {
-          const track = { id, lyric_id: id, source } as MusicTrack;
-          return await MusicProviderFactory.getProvider(source).getLyric(track, signal);
+          const track = { id, lyric_id: id, source: effectiveSource } as MusicTrack;
+          return await MusicProviderFactory.getProvider(effectiveSource).getLyric(track, signal);
         } catch (e) {
           if (e instanceof DOMException && e.name === 'AbortError') return null;
           logger.error("music-api", "getLyric failed", e);

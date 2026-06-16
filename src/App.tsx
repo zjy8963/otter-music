@@ -3,6 +3,7 @@ import { router } from "./router";
 import "./assets/global.css"; // Ensure styles are imported
 import { useEffect, useRef } from "react";
 import { useAppStore, useDownloadStore } from "./store";
+import { initAutoTest, checkAndRunScheduledTest } from "@/lib/auto-source-test";
 import { useSyncStore } from "@/store/sync-store";
 import { checkAndSync } from "@/lib/sync";
 import { cleanupCache } from "@/lib/utils/cache";
@@ -29,6 +30,14 @@ export default function App() {
     // 初始化下载记录
     useDownloadStore.getState().init();
 
+    // 内置源自检（非阻塞）
+    initAutoTest();
+
+    // 定时自检（每小时检查一次是否需要执行）
+    const scheduleInterval = setInterval(() => {
+      checkAndRunScheduledTest();
+    }, 60 * 60 * 1000);
+
     // 延迟执行缓存清理，避免阻塞首屏
     if ("requestIdleCallback" in window) {
       (window as any).requestIdleCallback(() => cleanupCache());
@@ -41,6 +50,7 @@ export default function App() {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       revokeAll();
+      clearInterval(scheduleInterval);
     };
   }, []);
 

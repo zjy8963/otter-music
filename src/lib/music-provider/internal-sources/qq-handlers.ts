@@ -71,7 +71,12 @@ function isValidQqUrl(url: string, songmid: string): boolean {
 // ============================================================
 // qq_xcvts — XCVTS API
 // ============================================================
-const XCVTS_KEYS = ["Nzg5OTMzNDRiOWJmMTEwNTY1NTU5OTAwOWNkYmEzZDI","Y2U3NzhlYjBkMTg1OGVkZmI0YjIwNzFhMTE1ZjFlZGY"];
+//const XCVTS_KEYS = ["Nzg5OTMzNDRiOWJmMTEwNTY1NTU5OTAwOWNkYmEzZDI=","Y2U3NzhlYjBkMTg1OGVkZmI0YjIwNzFhMTE1ZjFlZGY="];
+const XCVTS_KEYS = [
+  "78993344b9bf1105655599009cdba3d2",
+  "ce778eb0d1858edfb4b2071a115f1edf"
+];
+
 const XCVTS_QUALITIES = ["臻品母带", "臻品全景声", "臻品2.0", "SQ无损", "HQ高品质", "中品质", "普通", "低品质", "试听"];
 
 export const qqXcvtsHandler: InternalSourceHandler = {
@@ -79,7 +84,8 @@ export const qqXcvtsHandler: InternalSourceHandler = {
   async resolveUrl(songId, _quality, signal) {
     for (const q of XCVTS_QUALITIES.slice(0, 4)) {
       try {
-        const apiKey = atob(XCVTS_KEYS[Math.floor(Math.random() * XCVTS_KEYS.length)]);
+        const apiKey = XCVTS_KEYS[Math.floor(Math.random() * XCVTS_KEYS.length)];
+        //const apiKey = atob(XCVTS_KEYS[Math.floor(Math.random() * XCVTS_KEYS.length)]);
         const resp = await fetchJSON(
           `https://api.xcvts.cn/api/music/qq?apiKey=${encodeURIComponent(apiKey)}&mid=${songId}&type=${encodeURIComponent(q)}`,
           { headers: BASE_HEADERS }, signal
@@ -152,7 +158,7 @@ export const qqLiuyunidcHandler: InternalSourceHandler = {
 // qq_317ak — 317AK API
 // musicdl: _parsewith317akapi
 // ============================================================
-const AK317_KEYS_QQ = ["Wk83NlFKQ0lINVBQSUNKT09YVUg"];
+const AK317_KEYS_QQ = ["charlespikachuWk83NlFKQ0lINVBQSUNKT09YVUg="];
 
 export const qq317akHandler: InternalSourceHandler = {
   id: "qq_317ak",
@@ -180,15 +186,15 @@ export const qq317akHandler: InternalSourceHandler = {
 // musicdl: _parsewithnkiapi
 // ============================================================
 const NKI_KEYS = [
-  "MjhmZWNlOTI1NDM5YjA1Mjc5MmE5Nzk4OWM4NzBjZWQzODAzYTcxYzZiNTM0ZjcxZTVhNTMzMzhiMmQzMWVmOA",
-  "YzRjNGY1ZmMzNmJhZDRjYWNiOTg4MzllMTRmZWE0MDI3N2IzNWVhMmViMWJhYmRhZDdiYmRlMTI4NDAwZjNiMQ",
+  "28fece925439b052792a97989c870ced3803a71c6b534f71e5a53338b2d31ef8",
+  "c4c4f5fc36bad4cacb98839e14fea40277b35ea2eb1babdad7bbde128400f3b1",
 ];
 
 export const qqNkiHandler: InternalSourceHandler = {
   id: "qq_nki",
   async resolveUrl(songId, _quality, signal) {
     try {
-      const apiKey = atob(NKI_KEYS[Math.floor(Math.random() * NKI_KEYS.length)]);
+      const apiKey = NKI_KEYS[Math.floor(Math.random() * NKI_KEYS.length)];
       const resp = await fetchJSON(
         `https://api.nki.pw/API/music_open_api.php?mid=${songId}&apikey=${encodeURIComponent(apiKey)}`,
         {
@@ -273,8 +279,8 @@ export const qqCyHandler: InternalSourceHandler = {
 // musicdl: _parsewithxianyuwapi
 // ============================================================
 const XIANYUW_KEYS_QQ = [
-  "c2stYTdiNDJjOGRkZGZlMWYxODk0M2MwODM4Nzk1ZjNjNzA",
-  "c2stYzlmNDNlYWFmODI3Njc0MzNhOGE1NDRmNmI2MTcwYjc",
+  "charlespikachuc2stYzlmNDNlYWFmODI3Njc0MzNhOGE1NDRmNmI2MTcwYjc=",
+  "charlespikachuc2stMDE4YjlmOGQ4MGRjMTg5OGEyOTI3ZTgwMjA2NjNkODY=",
 ];
 
 export const qqXianyuwHandler: InternalSourceHandler = {
